@@ -1,2 +1,2 @@
 # Proyecto de Desarrollo_Piero
-En este proyecto 
+Se puede ver adjunto el código, junto con mi mapa, tabla de indice de pobreza con FGT0 por estado, la base de datos que limpie (que es de donde salio todo mi codigo)Adjunto el código completo, junto con el mapa que ilustra la incidencia de la pobreza (FGT0) por estado. También incluyo la tabla con los índices de pobreza FGT0 desglosados por estado, así como la base de datos que he limpiado y utilizado para generar todo el análisis.
