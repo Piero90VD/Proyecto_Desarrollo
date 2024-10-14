@@ -120,10 +120,7 @@ FGT0_por_estado <- FGT0_por_estado %>%
 
 print(FGT0_por_estado)
 
-## Pasar los datos a STATA
-
-# Exportar el dataframe a un archivo .dta
-write_dta(FGT0_por_estado, "FGT0_por_estado.dta")
+## Hacer la gráfica
 
 ruta_shapefile <- "/Users/pierovercelli/Downloads/dest2019gw/dest2019gw.shp"
    
