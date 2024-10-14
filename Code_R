@@ -1,0 +1,162 @@
+## Instalación de paquetes necesarios 
+
+install.packages(c("readxl", "dplyr", "ggplot2", "sf", "tmap", "ggthemes", "matrixStats", "Hmisc"))
+install.packages("haven")
+install.packages("sf")
+install.packages("ggplot2")
+# Cargar los paquetes
+library(haven)
+library(ggplot2)
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(sf)
+library(tmap)
+library(ggthemes)
+library(matrixStats)
+library(Hmisc)  # Para calcular la mediana ponderada
+library(sf)
+
+# 1. Verificar los datos
+head(Datos_Final)
+summary(Datos_Final)
+str(Datos_Final)
+
+# 2. Calcular el gasto per cápita en alimentos
+Datos_Final <- Datos_Final %>%
+  mutate(gasto_alimentos_pc = gasto_alimentos / tot_integ)
+
+# 3. Calcular la mediana no ponderada del gasto per cápita en alimentos
+mediana_alimentos <- median(Datos_Final$gasto_alimentos_pc, na.rm = TRUE)
+
+# Definir la línea de pobreza como el 50% de la mediana
+linea_pobreza_alimentos <- mediana_alimentos * 0.5
+
+# Imprimir la línea de pobreza
+cat("Línea de pobreza basada en gasto en alimentos (50% de la mediana):", 
+    linea_pobreza_alimentos, "\n")
+
+# 4. Crear la variable indicadora de pobreza
+Datos_Final <- Datos_Final %>%
+  mutate(pobre_alimentos = ifelse(gasto_alimentos_pc < linea_pobreza_alimentos, 1, 0))
+
+# Verificar la distribución de hogares pobres
+table(Datos_Final$pobre_alimentos)
+
+# 5. Calcular FGT0: Incidencia de la pobreza (no ponderada)
+FGT0 <- mean(Datos_Final$pobre_alimentos, na.rm = TRUE)
+
+# Imprimir FGT0
+cat("FGT0 (Incidencia de la pobreza):", FGT0, "\n")
+
+# 6. Calcular FGT1: Brecha de la pobreza (no ponderada)
+Datos_Final <- Datos_Final %>%
+  mutate(brecha_alimentos = ifelse(pobre_alimentos == 1, 
+                                   (linea_pobreza_alimentos - gasto_alimentos_pc) / 
+                                     linea_pobreza_alimentos, 
+                                   0))
+
+FGT1 <- mean(Datos_Final$brecha_alimentos, na.rm = TRUE)
+
+# Imprimir FGT1
+cat("FGT1 (Brecha de la pobreza):", FGT1, "\n")
+
+# 7. Calcular FGT2: Severidad de la pobreza (no ponderada)
+Datos_Final <- Datos_Final %>%
+  mutate(brecha2_alimentos = brecha_alimentos^2)
+
+FGT2 <- mean(Datos_Final$brecha2_alimentos, na.rm = TRUE)
+
+# Imprimir FGT2
+cat("FGT2 (Severidad de la pobreza):", FGT2, "\n")
+
+    ### Por estado 
+
+# Calcular FGT0 por estado
+FGT0_por_estado <- Datos_Final %>%
+  group_by(ubica_geo) %>%
+  summarise(
+    FGT0 = mean(pobre_alimentos, na.rm = TRUE)
+  )
+
+state_names <- c(
+  'Aguascalientes',
+  'Baja California',
+  'Baja California Sur',
+  'Campeche',
+  'Coahuila de Zaragoza',
+  'Colima',
+  'Chiapas',
+  'Chihuahua',
+  'Ciudad de México',
+  'Durango',
+  'Guanajuato',
+  'Guerrero',
+  'Hidalgo',
+  'Jalisco',
+  'México',
+  'Michoacán de Ocampo',
+  'Morelos',
+  'Nayarit',
+  'Nuevo León',
+  'Oaxaca',
+  'Puebla',
+  'Querétaro',
+  'Quintana Roo',
+  'San Luis Potosí',
+  'Sinaloa',
+  'Sonora',
+  'Tabasco',
+  'Tamaulipas',
+  'Tlaxcala',
+  'Veracruz de Ignacio de la Llave',
+  'Yucatán',
+  'Zacatecas'
+)
+
+# Agregar la columna 'estado' basada en 'ubica_geo'
+FGT0_por_estado <- FGT0_por_estado %>%
+  mutate(estado = state_names[ubica_geo])
+
+print(FGT0_por_estado)
+
+## Pasar los datos a STATA
+
+# Exportar el dataframe a un archivo .dta
+write_dta(FGT0_por_estado, "FGT0_por_estado.dta")
+
+ruta_shapefile <- "/Users/pierovercelli/Downloads/dest2019gw/dest2019gw.shp"
+   
+# Leer el shapefile
+shapefile_estados <- st_read(ruta_shapefile)
+
+# Ver la estructura del shapefile
+print(shapefile_estados)
+
+shapefile_estados <- shapefile_estados %>%
+  mutate(CVE_ENT = as.numeric(CVE_ENT))
+
+shapefile_pobreza <- shapefile_estados %>%
+  left_join(FGT0_por_estado, by = c("CVE_ENT" = "ubica_geo"))
+
+# Ver las primeras filas del shapefile con los datos de pobreza
+head(shapefile_pobreza)
+
+# Crear el mapa de FGT0
+ggplot(data = shapefile_pobreza) +
+  geom_sf(aes(fill = FGT0), color = "black") +
+  scale_fill_viridis_c(option = "plasma", 
+                       name = "FGT0\nIncidencia de Pobreza", 
+                       na.value = "grey50") +
+  theme_minimal() +
+  labs(title = "Incidencia de la Pobreza (FGT0) por Estado en México",
+       subtitle = "Medida FGT0: Proporción de hogares en pobreza") +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 8)
+  )
+
+# Guardar el mapa como PNG
+ggsave("mapa_pobreza_FGT0.png", width = 10, height = 8, dpi = 300)
